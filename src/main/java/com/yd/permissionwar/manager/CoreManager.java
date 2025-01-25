@@ -26,27 +26,38 @@ public class CoreManager {
     public void setMainCore(Block block) {
         mainCoreLocation = block.getLocation();
         block.setType(Material.YELLOW_STAINED_GLASS);
+        isMainCoreGold = false;
         Bukkit.getLogger().info("메인 코어가 설정되었습니다!");
+
+    }
+
+    public void scheduleMainCoreGoldTask() {
+        // 메인코어 설정되지 않았을 시 취소
+        if (mainCoreLocation == null) {
+            Bukkit.getLogger().warning("메인 코어가 설정되지 않았습니다!");
+            return;
+        }
 
         // 게임 시작 시 5분 후 금블럭으로 변경
         new BukkitRunnable() {
             @Override
             public void run() {
-                if (!plugin.isGameRunning()) {
+                if (!plugin.isGameRunning() || mainCoreLocation == null) {
                     cancel();
+                    return;
                 }
-                if (mainCoreLocation != null) {
-                    mainCoreLocation.getBlock().setType(Material.GOLD_BLOCK);
-                    isMainCoreGold = true;
-                }
+                mainCoreLocation.getBlock().setType(Material.GOLD_BLOCK);
+                isMainCoreGold = true;
+                Bukkit.getLogger().info("메인 코어가 금 블록으로 변경되었습니다!");
             }
         }.runTaskLater(plugin, 5 * 60 * 20L); // 5분 (5*60초)
     }
 
+
     public void setMainCoreBackToGlass() {
         if (mainCoreLocation != null) {
             mainCoreLocation.getBlock().setType(Material.YELLOW_STAINED_GLASS);
-            isMainCoreGold = true;
+            isMainCoreGold = false;
         }
         // 5분후 다시 금블럭으로 변환 예약
         new BukkitRunnable() {
@@ -58,6 +69,7 @@ public class CoreManager {
                 }
                 mainCoreLocation.getBlock().setType(Material.GOLD_BLOCK);
                 isMainCoreGold = true;
+                Bukkit.getLogger().info("메인 코어가 금 블록으로 다시 변경되었습니다!");
             }
         }.runTaskLater(plugin, 5 * 60 * 20L);
     }

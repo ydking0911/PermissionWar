@@ -23,7 +23,6 @@ public final class PermissionWar extends JavaPlugin {
     private CoreManager coreManager;
     private LockManager lockManager;
     private ScoreboardManager scoreboardManager;
-    private MoneyManager moneyManager;
     private ConfigUtil configUtil;
 
     private Economy economy;
@@ -45,7 +44,6 @@ public final class PermissionWar extends JavaPlugin {
         coreManager = new CoreManager(this);
         lockManager = new LockManager(this);
         scoreboardManager = new ScoreboardManager(this);
-        moneyManager = new MoneyManager(this, configUtil);
 
         getServer().getPluginManager().registerEvents(new MenuOpenListener(this), this);
         getServer().getPluginManager().registerEvents(new GUIListener(this), this);
@@ -162,6 +160,9 @@ public final class PermissionWar extends JavaPlugin {
         this.gameTime = 40 * 60;
         teamManager.resetTeamScore();
         scoreboardManager.updateAllPlayersScoreboard();
+
+        coreManager.scheduleMainCoreGoldTask();
+
         getLogger().info("권한전쟁 게임 시작");
         startGameTimer();
     }
@@ -184,32 +185,5 @@ public final class PermissionWar extends JavaPlugin {
         }
         getLogger().info("권한전쟁 게임 종료");
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 }

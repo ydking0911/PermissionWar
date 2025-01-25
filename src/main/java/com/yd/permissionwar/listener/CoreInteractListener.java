@@ -26,6 +26,8 @@ public class CoreInteractListener implements Listener {
         if (event.getClickedBlock() == null) return;
         if (event.getAction().toString().contains("RIGHT_CLICK")) {
             Block block = event.getClickedBlock();
+
+            // 중앙코어
             if (coreManager.isMainCore(block)) {
                 if (coreManager.isMainCoreGold()) {
                     Player player = event.getPlayer();

@@ -14,6 +14,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 
 import java.util.*;
 
@@ -76,6 +77,7 @@ public class GUIListener implements Listener {
 
     private void handleTeamGUIClick(Player player, String title, int slot) {
         if (slot == 26) {
+            // 랜덤 플레이어 잠그기
             Player randomOpponent = lockManager.getRandomOpponent(player);
             if (randomOpponent == null) {
                 player.sendMessage(ChatColor.RED + "잠글 수 있는 상대가 없습니다.");
@@ -83,8 +85,9 @@ public class GUIListener implements Listener {
                 openLockPermGUI(player, randomOpponent);
             }
         } else {
+            // 특정 플레이어 머리 클릭
             ItemStack clickedItem = player.getOpenInventory().getItem(slot);
-            if (clickedItem.getType() == Material.PLAYER_HEAD) {
+            if (clickedItem != null && clickedItem.getType() == Material.PLAYER_HEAD) {
                 String targetName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
                 Player target = Bukkit.getPlayerExact(targetName);
                 if (target != null) {
@@ -103,34 +106,48 @@ public class GUIListener implements Listener {
             return;
         }
 
-        if (slot == 26) {
-            lockManager.lockRandomPermission(player, target);
-        } else {
-            ItemStack clickedItem = player.getOpenInventory().getItem(slot);
-            String permName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
-            double cost = configUtil.getDouble("lock-cost." + permName, 10.0);
-            if (plugin.getEconomy().getBalance(player) < cost) {
-                player.sendMessage(ChatColor.RED + "돈이 부족합니다! 필요 금액: " + cost);
-                return;
+        try {
+            if (slot == 26) {
+                // 랜덤 권한 잠그기
+                lockManager.lockRandomPermission(player, target);
+            } else {
+                // 특정 권한 잠그기
+                ItemStack clickedItem = player.getOpenInventory().getItem(slot);
+                if (clickedItem == null || !clickedItem.hasItemMeta()) return;
+
+                // 아이템의 DisplayName = 순수 권한 이름 (ex: "점프")
+                String permName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
+                if (permName == null || permName.isEmpty()) {
+                    player.sendMessage(ChatColor.RED + "잘못된 권한입니다.");
+                    return;
+                }
+
+                // LockManager에서 처리 (출금 + 잠금)
+                lockManager.lockPermission(player, target, permName);
             }
-            plugin.getEconomy().withdrawPlayer(player, cost);
-            lockManager.lockPermission(player, target, permName);
+        } catch (Exception e) {
+            player.sendMessage(ChatColor.RED + "권한 잠금 중 오류가 발생했습니다.");
+            plugin.getLogger().severe("Permission lock error: " + e.getMessage());
         }
         player.closeInventory();
     }
 
     private void handleUnlockPermissionGUIClick(Player player, int slot) {
         if (slot == 26) {
+            // 랜덤 권한 해제
             lockManager.unlockRandomPermission(player);
         } else {
+            // 특정 권한 해제
             ItemStack clickedItem = player.getOpenInventory().getItem(slot);
+            if (clickedItem == null || !clickedItem.hasItemMeta()) return;
+
+            // DisplayName = 순수 권한 이름
             String permName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
-            double cost = configUtil.getDouble("unlock-cost." + permName, 5.0);
-            if (plugin.getEconomy().getBalance(player) < cost) {
-                player.sendMessage(ChatColor.RED + "돈이 부족합니다! 필요 금액: " + cost);
+            if (permName == null || permName.isEmpty()) {
+                player.sendMessage(ChatColor.RED + "잘못된 권한입니다.");
                 return;
             }
-            plugin.getEconomy().withdrawPlayer(player, cost);
+
             lockManager.unlockPermission(player, permName);
         }
         player.closeInventory();
@@ -140,6 +157,7 @@ public class GUIListener implements Listener {
         String playerTeam = teamManager.getTeam(player);
         Inventory inv = Bukkit.createInventory(null, 27, playerTeam.equals("RED") ? "블루팀GUI" : "레드팀GUI");
 
+        // 상대 팀 플레이어 목록
         List<Player> opponents = getTeamPlayers(playerTeam.equals("RED") ? "BLUE" : "RED");
         for (int i = 0; i < Math.min(opponents.size(), 26); i++) {
             inv.setItem(i, createHeadItem(opponents.get(i)));
@@ -150,17 +168,33 @@ public class GUIListener implements Listener {
     }
 
     private void openLockPermGUI(Player locker, Player target) {
-        String lockerTeam = teamManager.getTeam(locker);
         Inventory inv = Bukkit.createInventory(null, 27, "권한 잠그기");
+        String[] permissions = { "앉기", "점프", "때리기", "이동하기", "달리기", "NPC상호작용하기", "블럭캐기", "블럭설치하기", "버리기" };
 
-        String[] permissions = {"앉기", "점프", "때리기", "이동하기", "달리기", "NPC상호작용하기", "블럭캐기", "블럭설치하기", "버리기"};
         for (int i = 0; i < permissions.length; i++) {
             double cost = configUtil.getDouble("lock-cost." + permissions[i], 10.0);
-            inv.setItem(i, createItem(Material.PAPER, permissions[i], ChatColor.YELLOW + permissions[i] + " (" + cost + ")"));
+            
+            ItemStack paper = new ItemStack(Material.PAPER);
+            ItemMeta meta = paper.getItemMeta();
+
+            // 권한 이름만 표시
+            meta.setDisplayName(ChatColor.YELLOW + permissions[i]);
+
+            // 비용은 Lore로 표시
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.GRAY + "비용: " + cost);
+            meta.setLore(lore);
+
+            paper.setItemMeta(meta);
+            inv.setItem(i, paper);
         }
 
+        // 26번 슬롯 = "랜덤 권한 잠그기"
         inv.setItem(26, createShellItem("랜덤 권한 잠그기"));
+
+        // 이 GUI를 열 때, '어느 플레이어에게 잠글지'를 저장
         PermGUIHolder.setTarget(locker.getUniqueId(), target);
+
         locker.openInventory(inv);
     }
 
@@ -171,7 +205,18 @@ public class GUIListener implements Listener {
         int index = 0;
         for (String perm : lockedPermissions) {
             double cost = configUtil.getDouble("unlock-cost." + perm, 5.0);
-            inv.setItem(index++, createItem(Material.PAPER, perm, ChatColor.YELLOW + perm + " (" + cost + ")"));
+
+            ItemStack paper = new ItemStack(Material.PAPER);
+            ItemMeta meta = paper.getItemMeta();
+
+            meta.setDisplayName(ChatColor.YELLOW + perm);
+
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.GRAY + "해제 비용: " + cost);
+            meta.setLore(lore);
+
+            paper.setItemMeta(meta);
+            inv.setItem(index++, paper);
         }
 
         inv.setItem(26, createShellItem("랜덤 권한 해제"));
@@ -190,18 +235,15 @@ public class GUIListener implements Listener {
 
     private ItemStack createHeadItem(Player player) {
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-        ItemMeta meta = head.getItemMeta();
-        meta.setDisplayName(ChatColor.YELLOW + player.getName());
-        head.setItemMeta(meta);
-        return head;
-    }
 
-    private ItemStack createItem(Material material, String name, String displayName) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(displayName);
-        item.setItemMeta(meta);
-        return item;
+        ItemMeta meta = head.getItemMeta();
+        if (meta instanceof SkullMeta) {
+            SkullMeta skullMeta = (SkullMeta) meta;
+            skullMeta.setOwner(player.getName());
+            skullMeta.setDisplayName(ChatColor.YELLOW + player.getName());
+            head.setItemMeta(skullMeta);
+        }
+        return head;
     }
 
     private ItemStack createShellItem(String displayName) {
@@ -212,7 +254,7 @@ public class GUIListener implements Listener {
         return shell;
     }
 
-
+    // 누가 누구를 대상으로 잠금을 거는지 -> 기억하는 내부 클래스
     private static class PermGUIHolder {
         private static final Map<UUID, UUID> lockerTargetMap = new HashMap<>();
 
