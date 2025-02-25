@@ -38,4 +38,39 @@ The project uses Maven for dependency management. Build the plugin with:
 
 ```bash
 mvn clean package
+```
 
+### Configuration
+
+You can change Integer value of config.yml
+
+```bash
+lock-cost:
+  앉기: 10
+  점프: 10
+  때리기: 15
+  이동하기: 20
+  달리기: 20
+  NPC상호작용하기: 15
+  블럭캐기: 25
+  블럭설치하기: 25
+  버리기: 10
+
+unlock-cost:
+  앉기: 5
+  점프: 5
+  때리기: 7
+  이동하기: 10
+  달리기: 10
+  NPC상호작용하기: 7
+  블럭캐기: 12
+  블럭설치하기: 12
+  버리기: 5
+
+```
+
+### Commands
+
+```bash
+/명령어
+```
